@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "889258066142",
+    "project_id": "sathwika-trade-media",
+    "storage_bucket": "sathwika-trade-media.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889258066142:android:aeb4683f2f525238d6024f",
+        "android_client_info": {
+          "package_name": "com.myapp.stm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdjZH8y0HNwo_WUF9U9-t7sxvgTe_QLwk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

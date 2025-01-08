@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,16 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {faEdit, faTrash, faPlus} from '@fortawesome/free-solid-svg-icons';
 import Toast from 'react-native-toast-message';
 
 const GroupFolder = () => {
   const navigation = useNavigation();
-  const [createFolderModalVisible, setCreateFolderModalVisible] = useState(false);
+  const [createFolderModalVisible, setCreateFolderModalVisible] =
+    useState(false);
   const [loading, setLoading] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolder, setEditingFolder] = useState(null);
@@ -26,94 +27,133 @@ const GroupFolder = () => {
   const [folderCounts, setFolderCounts] = useState({});
   const [nextFolderId, setNextFolderId] = useState(1);
   const [folders, setFolders] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState(null);
 
   // Fetch folders and phone counts when component mounts
   useEffect(() => {
+    setLoading(true);
     const unsubscribe = firestore()
       .collection('folders')
       .orderBy('id', 'asc')
       .onSnapshot(snapshot => {
         const fetchedFolders = snapshot.docs.map(doc => ({
-          id: doc.data().id,
+          id: doc.id,
           ...doc.data(),
         }));
         setFolders(fetchedFolders);
-        fetchPhoneNumbersCount(fetchedFolders);  // Fetch counts after folders are retrieved
-        // Set next folder ID based on the last folder
-        if (fetchedFolders.length > 0) {
-          setNextFolderId(fetchedFolders[fetchedFolders.length - 1].id + 1);
-        }
+        fetchPhoneNumbersCount(fetchedFolders);
+        setNextFolderId(
+          fetchedFolders.length > 0
+            ? fetchedFolders[fetchedFolders.length - 1].id + 1
+            : 1,
+        );
+        setLoading(false);
       });
-
+      setLoading(false);
     return () => unsubscribe();
   }, []);
 
-  // Use useFocusEffect to fetch phone number counts when the screen is focused
+  // Re-fetch phone number counts when screen is focused
   useFocusEffect(
     useCallback(() => {
-      fetchPhoneNumbersCount(folders); // Re-fetch phone numbers when the screen is focused
-    }, [folders]) // Add folders as dependency to re-run when folders change
+      fetchPhoneNumbersCount(folders);
+    }, [folders]),
   );
-
-  const fetchPhoneNumbersCount = useCallback(async (fetchedFolders) => {
+  const fetchPhoneNumbersCount = useCallback(async fetchedFolders => {
     const counts = {};
     const loadingState = {};
 
-    for (const folder of fetchedFolders) {
+    const fetchCounts = fetchedFolders.map(async folder => {
+      loadingState[folder.id] = true;
       try {
-        loadingState[folder.id] = true; // Start loading for the folder count
+        setLoading(true);
         const usersCollection = firestore().collection('users');
         const querySnapshot = await usersCollection
-          .where(`packages.${folder.id}`, '!=', null) // Check if users have this folder's package
+          .where(`packages.${folder.id}`, '!=', null)
           .get();
 
-        counts[folder.id] = querySnapshot.size; // Store the count of users with phone numbers in this folder
+        counts[folder.id] = querySnapshot.size;
+        setLoading(false);
       } catch (error) {
-        console.error('Error fetching phone numbers for folder:', folder.id, error);
-        Alert.alert('Error', 'Failed to fetch phone numbers. Please try again.');
+        setLoading(false);
+        console.error(`Error fetching count for folder ${folder.id}:`, error);
+        Alert.alert(
+          'Error',
+          'Failed to fetch phone numbers. Please try again.',
+        );
       } finally {
-        loadingState[folder.id] = false; // Stop loading for this folder
+        setLoading(false);
+        loadingState[folder.id] = false;
       }
-    }
+    });
 
-    setFolderCounts(counts); // Set the phone number counts for all folders
-    setLoadingCounts(loadingState); // Set the loading state for all folders
+    await Promise.all(fetchCounts);
+    setFolderCounts(counts);
+    setLoadingCounts(loadingState);
   }, []);
 
   const deleteFolder = async folder => {
     try {
-      const folderId = String(folder.id); // Ensure folder.id is a string
+      if (!folder || typeof folder.id === 'undefined') {
+        console.error('Invalid folder object:', folder);
+        showToast('error', 'Error', 'Invalid folder object provided.');
+        return;
+      }
+  
+      const folderId = String(folder.id); // Ensure folderId is a string
+  
+      setLoading(true);
+  
+      // Check if folder exists before deletion
+      const folderDoc = await firestore().collection('folders').doc(folderId).get();
+      if (!folderDoc.exists) {
+        console.error('Folder does not exist:', folderId);
+        showToast('error', 'Error', 'Folder does not exist.');
+        setLoading(false);
+        return;
+      }
+  
+      // Proceed with deletion
       await firestore().collection('folders').doc(folderId).delete();
-
-      // Update the local state to remove the deleted folder
-      setFolders(prevFolders => prevFolders.filter(f => f.id !== folder.id));
-
-      // Show success toast message
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Folder deleted successfully!',
-        position: 'top',
-      });
-
+      setFolders(prev => prev.filter(f => f.id !== folder.id)); // Remove from local state
+      showToast('success', 'Success', 'Folder deleted successfully!');
     } catch (error) {
-      console.error('Error deleting folder: ', error);
-
-      // Show error toast message
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to delete folder. Please try again.',
-        position: 'bottom',
-      });
+      console.error('Error deleting folder:', error);
+      showToast('error', 'Error', 'Failed to delete folder. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
+  
+  
 
+  const createNewFolder = async () => {
+    if (!newFolderName) {
+      showToast('error', 'Error', 'Please enter a folder name.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await firestore().collection('folders').doc(nextFolderId.toString()).set({
+        id: nextFolderId,
+        name: newFolderName,
+      });
+      setCreateFolderModalVisible(false);
+      setNewFolderName('');
+      setNextFolderId(prevId => prevId + 1);
+      showToast('success', 'Success', 'Folder created successfully!');
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      console.error('Error creating folder:', error);
+      showToast('error', 'Error', 'Failed to create folder. Please try again.');
+    }
+  };
 
   const [editFolderModalVisible, setEditFolderModalVisible] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState(null);
   const [editedFolderName, setEditedFolderName] = useState('');
+
   const openEditFolderModal = folder => {
     setFolderToEdit(folder);
     setEditedFolderName(folder.name);
@@ -121,91 +161,31 @@ const GroupFolder = () => {
   };
 
   const updateFolder = async () => {
-    if (editedFolderName) {
-      try {
-        await firestore()
-          .collection('folders')
-          .doc(folderToEdit.id.toString())
-          .update({ name: editedFolderName });
+    if (!editedFolderName) {
+      showToast('error', 'Error', 'Please enter a folder name.');
+      return;
+    }
 
-        // Close the modal and reset state after successful update
-        setEditFolderModalVisible(false);
-        setFolderToEdit(null);
-        setEditedFolderName('');
-
-        // Show success toast message
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Folder updated successfully!',
-          position: 'top',
-        });
-
-      } catch (error) {
-        console.error('Error updating folder: ', error);
-
-        // Show error toast message
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Failed to update folder. Please try again.',
-          position: 'top',
-        });
-      }
-    } else {
-      // Show error toast message when folder name is not entered
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please enter a folder name.',
-        position: 'top',
-      });
+    try {
+      setLoading(true);
+      await firestore()
+        .collection('folders')
+        .doc(folderToEdit.id.toString())
+        .update({name: editedFolderName});
+      setEditFolderModalVisible(false);
+      setFolderToEdit(null);
+      setEditedFolderName('');
+      showToast('success', 'Success', 'Folder updated successfully!');
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      console.error('Error updating folder:', error);
+      showToast('error', 'Error', 'Failed to update folder. Please try again.');
     }
   };
 
-  const createNewFolder = async () => {
-    if (newFolderName) {
-      try {
-        await firestore()
-          .collection('folders')
-          .doc(nextFolderId.toString())
-          .set({
-            id: nextFolderId,
-            name: newFolderName,
-          });
-
-        // Display a success toast message
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Folder created successfully!',
-          position: 'top',
-        });
-
-        // Reset form and close modal
-        setCreateFolderModalVisible(false);
-        setNewFolderName('');
-        setNextFolderId(nextFolderId + 1);
-
-      } catch (error) {
-        console.error('Error creating folder: ', error);
-
-        // Display an error toast message
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Failed to create folder. Please try again.',
-          position: 'top',
-        });
-      }
-    } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please enter a folder name.',
-        position: 'top',
-      });
-    }
+  const showToast = (type, title, message) => {
+    Toast.show({type, text1: title, text2: message, position: 'top'});
   };
 
   const [showFolder, setShowFolder] = useState(false);
@@ -217,8 +197,8 @@ const GroupFolder = () => {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setCreateFolderModalVisible(true)}
-          style={{ flexDirection: 'row' }}>
-          <FontAwesomeIcon icon={faPlus} size={20} style={{ marginRight: 8 }} />
+          style={{flexDirection: 'row'}}>
+          <FontAwesomeIcon icon={faPlus} size={20} style={{marginRight: 8}} />
           <Text style={styles.headerText}>Create Folder</Text>
         </TouchableOpacity>
       </View>
@@ -259,7 +239,7 @@ const GroupFolder = () => {
                   <TouchableOpacity
                     style={styles.folderContent}
                     onPress={() =>
-                      navigation.navigate('FolderScreen', { folder })
+                      navigation.navigate('FolderScreen', {folder})
                     }>
                     <Image
                       source={require('../assets/folders.jpg')}
@@ -272,9 +252,10 @@ const GroupFolder = () => {
                         <Text>Loading...</Text>
                       ) : (
                         <Text style={styles.countText}>
-
-                          [<Text style={styles.countNumber}>
-                            {folderCounts[folder.id] || 0}{/* Show count of phone numbers */}
+                          [
+                          <Text style={styles.countNumber}>
+                            {folderCounts[folder.id] || 0}
+                            {/* Show count of phone numbers */}
                           </Text>{' '}
                           Contacts]
                         </Text>
@@ -359,7 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2, // For Android shadow
@@ -377,7 +358,7 @@ const styles = StyleSheet.create({
   folderInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: "center",
+    alignItems: 'center',
   },
   text: {
     fontSize: 16,
@@ -442,36 +423,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  container: { flex: 1, padding: 20, backgroundColor: '#f0f0f0' },
-  listContent: { paddingBottom: 20 },
+  container: {flex: 1, padding: 20, backgroundColor: '#f0f0f0'},
+  listContent: {paddingBottom: 20},
   packageContainer: {
     marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
     borderRadius: 10,
   },
-  packageTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  packageTitle: {fontSize: 20, fontWeight: 'bold', marginBottom: 10},
   durationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 5,
   },
-  durationText: { fontSize: 16 },
+  durationText: {fontSize: 16},
   addButton: {
     backgroundColor: '#4CAF50',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
-  addButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  addButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
   deleteButton: {
     backgroundColor: '#FF5722',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
-  deleteButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  deleteButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
 
   modalContainer: {
     flex: 1,
@@ -485,7 +466,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  modalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 15},
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -499,32 +480,32 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 10,
   },
-  saveButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  saveButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
   cancelButton: {
     backgroundColor: '#FF5722',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
-  cancelButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
-  durationsList: { marginTop: 10 },
-  container: { flex: 1, padding: 20, backgroundColor: '#f0f0f0' },
-  listContent: { paddingBottom: 20 },
+  cancelButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
+  durationsList: {marginTop: 10},
+  container: {flex: 1, padding: 20, backgroundColor: '#f0f0f0'},
+  listContent: {paddingBottom: 20},
   packageContainer: {
     marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
     borderRadius: 10,
   },
-  packageTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  packageTitle: {fontSize: 20, fontWeight: 'bold', marginBottom: 10},
   durationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 5,
   },
-  durationText: { fontSize: 16 },
-  durationActions: { flexDirection: 'row', alignItems: 'center' },
+  durationText: {fontSize: 16},
+  durationActions: {flexDirection: 'row', alignItems: 'center'},
   actionButton: {
     marginHorizontal: 5,
     padding: 5,
@@ -570,7 +551,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
   },
-  createPackageButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  createPackageButtonText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -583,7 +564,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  modalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 15},
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -597,15 +578,15 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 10,
   },
-  saveButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  saveButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
   cancelButton: {
     backgroundColor: '#FF5722',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
-  cancelButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
-  durationsList: { marginTop: 10 },
+  cancelButtonText: {color: '#fff', textAlign: 'center', fontWeight: 'bold'},
+  durationsList: {marginTop: 10},
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -624,7 +605,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'blue',
     marginLeft: 10,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   countNumber: {
     marginLeft: 5,
@@ -632,7 +613,6 @@ const styles = StyleSheet.create({
     color: 'red',
     fontWeight: 'bold',
   },
-  
 });
 
 export default GroupFolder;

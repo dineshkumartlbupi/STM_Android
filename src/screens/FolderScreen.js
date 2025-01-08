@@ -25,201 +25,231 @@ const FolderScreen = ({route}) => {
   const [filteredPhoneNumbers, setFilteredPhoneNumbers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  useEffect(() => {
-    const filterDataBySearch = list => {
-      return list.filter(item => {
-        // Perform the actual filtering
-        return item.includes(search);
-      });
+  const [processedNumbers, setProcessedNumbers] = useState(new Set());
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func(...args), delay);
     };
+  };
 
-    setFilteredPhoneNumbers(filterDataBySearch(phoneNumbers));
+  useEffect(() => {
+    const debouncedFilter = debounce(() => {
+      const filtered = phoneNumbers.filter(number => number.includes(search));
+      setFilteredPhoneNumbers(filtered);
+    }, 0);
+  
+    debouncedFilter();
   }, [search, phoneNumbers]);
+  
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchUsersByPackageId = async packageId => {
+        console.log('Step 1: fetchUsersByPackageId called with packageId:', packageId); // Log when function is called
+        try {
+          setLoading(true);
+          console.log('Step 2: Loading state set to true'); // Log when loading starts
+  
+          // Firestore query with filter
+          const usersCollection = firestore().collection('users');
+          console.log('Step 3: Accessed Firestore collection "users"'); // Log Firestore access
+  
+          const querySnapshot = await usersCollection
+            .where(`packages.${packageId}`, '!=', null) // Filter documents where the packageId exists in packages
+            .get();
+  
+          console.log('Step 4: Query executed successfully'); // Log successful query execution
+          console.log('QuerySnapshot size:', querySnapshot.size); // Log the number of documents 
+          setLoading(false);
+          // found
+          const users = [];
+          querySnapshot.forEach(doc => {
+            setLoading(false);
+            const userData = doc.data();
+            console.log('Step 5: Processing document:', doc.id); // Log each document being processed
+            console.log('Document data:', userData); // Log document data
+            users.push(userData.phoneNumber); // Collect phone numbers of filtered users
+          });
+          console.log('Step 6: Collected phone numbers:', users); // Log the collected phone numbers
+          setPhoneNumbers(users); // Set the filtered phone numbers in state
+          setFilteredPhoneNumbers(users)
+          setLoading(false);
+          console.log('Step 7: Loading state set to false'); // Log when loading ends
+        } catch (error) {
+          setLoading(false);
+          console.error('Step 8: Error fetching users:', error); // Log the error
+          Alert.alert('Error', 'Failed to fetch users. Please try again.');
+        }
+      };
+      if (folder.id !== null) {
+        setLoading(false);
+        console.log('Step 9: folder.id is not null, fetching users for packageId:', folder.id); 
+        fetchUsersByPackageId(folder.id);
+      } else {
+        setLoading(false);
+        console.log('Step 10: folder.id is null, skipping fetchUsersByPackageId'); // Log when folder.id is null
+      }
+    }, [folder])
+  );
+
+
 
   
-  const handleAddNumbers = () => {
+  const generateRandomuid = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0,
+        v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  // Debugging wrapper for logging
+  const debugLog = (label, data) => {
+    console.log(`[DEBUG] ${label}:`, data);
+  };
+
+  const handleAddNumbers = async () => {
+    debugLog('handleAddNumbers inputText', inputText);
+  
     if (!inputText.trim()) {
       Alert.alert('Error', 'Please enter valid numbers.');
       return;
     }
   
     const numbersArray = inputText
-      .split(/[\n,]/)
-      .map(number => number.trim())
-      .filter(number => number);
+      .split(/[\n,]/) // Split input on newline or comma
+      .map(number => number.trim()) // Trim each number
+      .filter(number => /^[0-9]+$/.test(number)); // Validate numbers
   
-    // Find duplicates
-    const duplicates = numbersArray.filter(number =>
-      phoneNumbers.includes(number),
-    );
+    debugLog('Parsed numbersArray', numbersArray);
   
-    // Remove duplicates from the new numbers
-    const uniqueNumbers = numbersArray.filter(
-      number => !phoneNumbers.includes(number),
-    );
+    const newNumbersSet = new Set(phoneNumbers); // Use Set for efficient duplicate checks
+    const duplicates = [];
+    const uniqueNumbers = [];
   
-    if (duplicates.length > 0) {
-      Alert.alert('Duplicate Numbers', `These numbers are already in the list: ${duplicates.join(', ')}`);
+    numbersArray.forEach(number => {
+      if (newNumbersSet.has(number)) {
+        duplicates.push(number);
+      } else {
+        uniqueNumbers.push(number);
+        newNumbersSet.add(number); // Add to the set for tracking
+      }
+    });
+  
+    debugLog('Unique Numbers', uniqueNumbers);
+    debugLog('Duplicates', duplicates);
+  
+    if (uniqueNumbers.length > 0) {
+      setLoading(true);
+  
+      try {
+        const usersCollection = firestore().collection('users');
+        // Process Firestore additions for unique numbers
+        await Promise.all(
+          uniqueNumbers.map(async number => {
+            debugLog('Adding number to Firestore', number);
+  
+            const userSnapshot = await usersCollection.where('phoneNumber', '==', number).get();
+  
+            if (!userSnapshot.empty) {
+              debugLog('Number already exists in Firestore', number);
+            } else {
+              const randomId = generateRandomuid();
+              const id=folder.id;
+              const newUser = {
+                surname: 'Doe',
+                name: 'John',
+                phoneNumber: number,
+                shopName: 'Shop Name',
+                address: {
+                  villageCity: 'City',
+                  street: 'Street',
+                  mandal: 'Mandal',
+                  district: 'District',
+                  state: 'State',
+                },
+                packages: {
+                  [id]: '',
+                },
+                userid: randomId,
+              };
+              await usersCollection.doc(randomId).set(newUser);
+              debugLog('Added new user to Firestore', newUser);
+            }
+          }),
+        );
+        // Update local state after successful additions
+        setPhoneNumbers(prevNumbers => [...prevNumbers, ...uniqueNumbers]);
+        setInputText('');
+        setSuccessMessage('Successfully added new contacts.');
+  
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+  
+      } catch (error) {
+        console.error('Error adding numbers to Firestore:', error);
+        Alert.alert('Error', 'An error occurred while adding numbers to Firestore.');
+      } finally {
+        setLoading(false);
+      }
     }
   
-    setPhoneNumbers([...phoneNumbers, ...uniqueNumbers]);
-    setInputText('');
-
-    // Set success message
-    setSuccessMessage('Successfully added new contact');
-    setTimeout(() => {
-      setSuccessMessage(''); // Clear message after 3 seconds
-    }, 3000);
+    if (duplicates.length > 0) {
+      Alert.alert(
+        'Duplicate Numbers',
+        `These numbers are already in the list: ${duplicates.join(', ')}`,
+      );
+    }
+  
+    if (uniqueNumbers.length === 0 && duplicates.length === 0) {
+      Alert.alert('No Valid Numbers', 'No valid or unique numbers found to add.');
+    }
   };
   
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const fetchUsersByPackageId = async packageId => {
-        try {
-          const usersCollection = firestore().collection('users');
-          const querySnapshot = await usersCollection.get();
 
-          const users = [];
-          querySnapshot.forEach(doc => {
-            const userData = doc.data();
-            if (
-              userData.packages &&
-              userData.packages[packageId] !== undefined
-            ) {
-              users.push(userData.phoneNumber);
-            }
-          });
 
-          setPhoneNumbers(users); // Set the filtered phone numbers in state
-        } catch (error) {
-          console.error('Error fetching users:', error);
-          Alert.alert('Error', 'Failed to fetch users. Please try again.');
-        }
-      };
-      if (folder.id !== null) {
-        fetchUsersByPackageId(folder.id);
-      }
-    }, [folder]),
-  );
-  useFocusEffect(
-    React.useCallback(() => {
-      const createOrUpdateAccount = async (number, id) => {
-        console.log(
-          'Creating/updating account for:',
-          number,
-          'with package:',
-          id,
-        );
-        setLoading(true); // Start loading
-        try {
-          const usersCollection = firestore().collection('users');
 
-          // Query Firestore to check if the user already exists
-          const userSnapshot = await usersCollection
-            .where('phoneNumber', '==', number)
-            .get();
-
-          if (!userSnapshot.empty) {
-            // User exists, update the existing user's packages
-            const userDoc = userSnapshot.docs[0];
-            const userData = userDoc.data();
-            // console.log('User exists. Updating packages for:', number);
-
-            // Update the user's packages
-            const updatedPackages = {
-              ...userData.packages,
-              [id]: '', // Add the new package ID
-            };
-
-            await usersCollection
-              .doc(userDoc.id)
-              .update({packages: updatedPackages});
-            // console.log('User data updated in Firestore!');
-          } else {
-            // User does not exist, create a new account
-            const randomId = generateRandomuid();
-
-            await usersCollection.doc(randomId).set({
-              surname: 'Doe',
-              name: 'John',
-              phoneNumber: number,
-              shopName: 'Shop Name',
-              address: {
-                villageCity: 'City',
-                street: 'Street',
-                mandal: 'Mandal',
-                district: 'District',
-                state: 'State',
-              },
-              packages: {
-                [id]: '',
-              },
-              userid: randomId,
-            });
-
-            console.log('User data added to Firestore!');
-          }
-          //   Alert.alert('Success!', 'Data has been saved successfully.');
-        } catch (error) {
-          console.error(
-            'Error adding/updating user data in Firestore: ',
-            error,
-          );
-          //   Alert.alert('Error', 'Failed to save data. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      if (phoneNumbers.length > 0) {
-        phoneNumbers.forEach(number => {
-          createOrUpdateAccount(number, folder.id);
-        });
-      }
-    }, [phoneNumbers]),
-  );
-
-  const generateRandomuid = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
-      /[xy]/g,
-      function (c) {
-        var r = (Math.random() * 16) | 0,
-          v = c == 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      },
-    );
-  };
-
-  const handleDeleteNumber = async index => {
-    const numberToDelete = phoneNumbers[index];
-    console.log('Going to Delete Number  : ', numberToDelete);
-    setLoading(true); // Start loading
+  const handleDeleteNumber = async numberToDelete => {
+    console.log('Going to Delete Number:', numberToDelete);
+  
     try {
+      setLoading(true); // Start loading
       const usersCollection = firestore().collection('users');
-
       const userSnapshot = await usersCollection
         .where('phoneNumber', '==', numberToDelete)
+        .limit(1) // Optimize query by limiting results
         .get();
-
+  
       if (!userSnapshot.empty) {
         const userDoc = userSnapshot.docs[0];
-        await usersCollection.doc(userDoc.id).delete();
+        await usersCollection.doc(userDoc.id).delete(); // Delete the document
         console.log('User data deleted from Firestore!');
+  
+        // Show success message
         Toast.show({
           type: 'success',
           text1: 'Success',
           text2: 'Contact deleted successfully!',
           position: 'top',
         });
+  
+        // Update local state to remove the deleted number
+        setPhoneNumbers(phoneNumbers.filter(number => number !== numberToDelete));
+      } else {
+        Alert.alert('Not Found', 'Number not found in Firestore.');
       }
-      setPhoneNumbers(phoneNumbers.filter((_, i) => i !== index));
     } catch (error) {
-      console.error('Error deleting user data from Firestore: ', error);
+      console.error('Error deleting user data from Firestore:', error);
       Alert.alert('Error', 'Failed to delete data. Please try again.');
     } finally {
-      setLoading(false);
+      setLoading(false); // End loading
     }
   };
+  
+  
 
   return (
     <View style={styles.container}>
@@ -245,6 +275,7 @@ const FolderScreen = ({route}) => {
         value={inputText}
         onChangeText={setInputText}
         multiline
+         textAlignVertical="top"
       />
       <TouchableOpacity style={styles.addButton} onPress={handleAddNumbers}>
         <Text style={styles.addButtonText}>Add Numbers</Text>
@@ -257,7 +288,7 @@ const FolderScreen = ({route}) => {
         {filteredPhoneNumbers.map((number, index) => (
           <View key={index} style={styles.numberRow}>
             <Text style={styles.numberText}>{number}</Text>
-            <TouchableOpacity onPress={() => handleDeleteNumber(index)}>
+            <TouchableOpacity onPress={() => handleDeleteNumber(number)}>
               <FontAwesomeIcon icon={faTrash} size={20} color="red" />
             </TouchableOpacity>
           </View>
@@ -326,6 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     color: 'black',
+    height:250
   },
   addButton: {
     backgroundColor: '#DE0A1E',

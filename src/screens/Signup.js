@@ -28,6 +28,7 @@ import Modal from 'react-native-modal';
 const {width} = Dimensions.get('window');
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import { getFCMToken } from '../utils/notification';
 
 export default function Signup() {
   const [loading, setLoading] = useState(false);
@@ -214,6 +215,7 @@ export default function Signup() {
   const handleConfirmOTP = async () => {
     if (validateFields()) {
       if (phoneNumber.length === 10) {
+        const token = await getFCMToken();
         let totalPrice = 0;
         let totalPackagesWithDurationsAndPrice = [];
   
@@ -282,8 +284,10 @@ export default function Signup() {
                 mandal: mandal,
                 district: district,
                 state: state,
+               
               },
               packages: totalPackagesWithDurationsAndPrice, // Save packages with durations and prices
+              fcmToken: token,
             });
   
             console.log('User data updated in Firestore!');
@@ -309,6 +313,7 @@ export default function Signup() {
               },
               packages: totalPackagesWithDurationsAndPrice, // Save packages with durations and prices
               userid: randomId,
+              fcmToken: token,
             });
   
             console.log('User data added to Firestore!');

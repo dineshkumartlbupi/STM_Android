@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,8 @@ import {
   ActivityIndicator,
   ImageBackground,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faEdit,
   faFilterCircleXmark,
@@ -20,16 +20,15 @@ import {
   faL,
   faEnvelope,
   faFolder,
- 
 } from '@fortawesome/free-solid-svg-icons';
-import { ScrollView } from 'react-native-gesture-handler';
+import {ScrollView} from 'react-native-gesture-handler';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import NewsItem from '../components/NewsItem';
 import LatestItem from '../components/LatestItem';
 import DateFilter from '../components/DateFilter';
 import AdvertisementUpdateList from '../components/AdvertisementUpdateList';
-
+import debounce from 'lodash.debounce';
 const Home = () => {
   const navigation = useNavigation();
   const [search, setSearch] = useState('');
@@ -69,13 +68,12 @@ const Home = () => {
               onPress: () => setExitAlertShown(false),
             },
           ],
-          { cancelable: true },
+          {cancelable: true},
         );
         setTimeout(() => setExitAlertShown(false), 2000);
         return true;
       };
       BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
       };
@@ -104,21 +102,21 @@ const Home = () => {
       const isAdmin = await checkIfAdmin();
       const userPackages = await fetchUserPackages();
 
-      if (!userPackages || userPackages.length === 0) {
-        console.warn('No packages found for the user');
-        setLoading(false);
-        return;
-      }
-
       let query;
       const postsCollection = firestore().collection('post');
 
       if (isAdmin) {
         query = postsCollection.orderBy('timestamp', 'desc');
       } else {
-        query = postsCollection
-          .where('packages', 'array-contains-any', userPackages)
-          .orderBy('timestamp', 'desc');
+        if (!userPackages || userPackages.length === 0) {
+          console.warn('No packages found for the user');
+          setLoading(false);
+          return;
+        } else {
+          query = postsCollection
+            .where('packages', 'array-contains-any', userPackages)
+            .orderBy('timestamp', 'desc');
+        }
       }
 
       // Set up the listener
@@ -143,14 +141,15 @@ const Home = () => {
             let withinDateRange = true;
 
             // Log date information for debugging
-            console.log("Document ID:", documentSnapshot.id);
-            console.log("Timestamp:", timestamp);
-            if (adjustedFromDate) console.log("From Date:", adjustedFromDate);
-            if (adjustedToDate) console.log("To Date:", adjustedToDate);
+            console.log('Document ID:', documentSnapshot.id);
+            console.log('Timestamp:', timestamp);
+            if (adjustedFromDate) console.log('From Date:', adjustedFromDate);
+            if (adjustedToDate) console.log('To Date:', adjustedToDate);
 
             // Check date conditions based on fromDate and toDate
             if (adjustedFromDate && adjustedToDate) {
-              withinDateRange = timestamp >= adjustedFromDate && timestamp <= adjustedToDate;
+              withinDateRange =
+                timestamp >= adjustedFromDate && timestamp <= adjustedToDate;
             } else if (adjustedFromDate && !adjustedToDate) {
               withinDateRange = timestamp >= adjustedFromDate;
             } else if (!adjustedFromDate && adjustedToDate) {
@@ -175,7 +174,10 @@ const Home = () => {
               }
             }
           } else {
-            console.warn('Document missing required fields:', documentSnapshot.id);
+            console.warn(
+              'Document missing required fields:',
+              documentSnapshot.id,
+            );
           }
         });
 
@@ -203,6 +205,8 @@ const Home = () => {
         auth().currentUser.phoneNumber === '+918790720978') ||
       auth().currentUser.phoneNumber === '+919052288377' ||
       auth().currentUser.phoneNumber === '+918853389395' ||
+      auth().currentUser.phoneNumber === '+919455791624' ||
+      auth().currentUser.phoneNumber === '+919839204763' ||
       auth().currentUser.phoneNumber === '+917022863475' // New Admin phone number
     );
   };
@@ -324,60 +328,66 @@ const Home = () => {
     setIsFilterActive(true);
   };
 
- 
-
   const handleEditLatestUpdate = () => {
-    navigation.navigate('ShowAllUpdates', { flag: 'latest_updates' });
+    navigation.navigate('ShowAllUpdates', {flag: 'latest_updates'});
   };
 
   const handleDeleteLatestUpdate = item => {
-    navigation.navigate('ShowAllUpdates', { flag: 'latest_updates' });
+    navigation.navigate('ShowAllUpdates', {flag: 'latest_updates'});
   };
 
   const handleEditLatestNews = item => {
-    navigation.navigate('ShowAllUpdates', { flag: 'news' });
+    navigation.navigate('ShowAllUpdates', {flag: 'news'});
   };
   const handleDeleteLatestNews = item => {
-    navigation.navigate('ShowAllUpdates', { flag: 'news' });
+    navigation.navigate('ShowAllUpdates', {flag: 'news'});
   };
 
   const handleEditLatestAdvirtaisement = item => {
-    navigation.navigate('ShowAllUpdates', { flag: 'advertisement' });
+    navigation.navigate('ShowAllUpdates', {flag: 'advertisement'});
   };
   const handleDeleteLatestAdvertisement = item => {
-    navigation.navigate('ShowAllUpdates', { flag: 'advertisement' });
+    navigation.navigate('ShowAllUpdates', {flag: 'advertisement'});
   };
-
 
   return (
     <View style={styles.container}>
-
       <View style={styles.header}>
-        <View style={{flexDirection:"row" , alignItems:"center"}}>
-        <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
-          <ImageBackground
-            source={require("../assets/user.png")}
-            style={{
-              width: 30,
-              height: 30,
-              alignSelf: "flex-start", // Align to the start of the row
-              marginRight: 10, // Optional: space between image and text
-            }}
-            imageStyle={{ borderRadius: 15 }} // Adjusted for better visibility
-          />
-        </TouchableOpacity>
-        <Text style={{fontSize:16, color:'black', fontWeight:'600'}}>Profile</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <ImageBackground
+              source={require('../assets/user.png')}
+              style={{
+                width: 30,
+                height: 30,
+                alignSelf: 'flex-start', // Align to the start of the row
+                marginRight: 10, // Optional: space between image and text
+              }}
+              imageStyle={{borderRadius: 15}} // Adjusted for better visibility
+            />
+          </TouchableOpacity>
+          <Text style={{fontSize: 16, color: 'black', fontWeight: '600'}}>
+            Profile
+          </Text>
         </View>
 
         <View style={styles.textContainer}>
           <Text style={styles.updatesText}>Sathwika Trade Media</Text>
-          <Text style={{fontSize:12, color:'blue', alignSelf:"flex-end", fontWeight:"600"}}>7799062722</Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: 'blue',
+              alignSelf: 'flex-end',
+              fontWeight: '600',
+            }}>
+            7799062722
+          </Text>
         </View>
       </View>
 
       <View style={styles.boxContainer}>
         <View style={[styles.updateBox, styles.box1]}>
-          <View style={{ height: 34, flexDirection: 'row', marginBottom: 2 }}>
+          <View style={{height: 34, flexDirection: 'row', marginBottom: 2}}>
             <View style={styles.textInputContainerForSearch}>
               <TextInput
                 style={styles.textInputForSearch}
@@ -422,6 +432,8 @@ const Home = () => {
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
+                auth().currentUser.phoneNumber === '+919455791624' ||
+                auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
                 <View
                   style={{
@@ -430,7 +442,7 @@ const Home = () => {
                     alignItems: 'center',
                   }}>
                   <TouchableOpacity onPress={handleEditLatestUpdate}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -445,7 +457,7 @@ const Home = () => {
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={handleDeleteLatestUpdate}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -467,7 +479,6 @@ const Home = () => {
               return <LatestItem key={index} item={item} />;
             })}
           </ScrollView>
-
         </View>
 
         <View style={[styles.updateBox, styles.box2]}>
@@ -478,13 +489,15 @@ const Home = () => {
               flexDirection: 'row',
               justifyContent: 'space-between',
             }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: 'white' }}>
+            <Text style={{fontSize: 16, fontWeight: '800', color: 'white'}}>
               News
             </Text>
             {auth().currentUser &&
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
+                auth().currentUser.phoneNumber === '+919455791624' ||
+                auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
                 <View
                   style={{
@@ -493,7 +506,7 @@ const Home = () => {
                     alignItems: 'center',
                   }}>
                   <TouchableOpacity onPress={handleEditLatestNews}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -507,7 +520,7 @@ const Home = () => {
                     </View>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleDeleteLatestNews}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -529,7 +542,6 @@ const Home = () => {
               return <NewsItem key={index} item={item} />;
             })}
           </ScrollView>
-
         </View>
 
         <View style={[styles.updateBox, styles.box3]}>
@@ -540,17 +552,19 @@ const Home = () => {
               flexDirection: 'row',
               justifyContent: 'space-between',
             }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: 'white' }}>
+            <Text style={{fontSize: 16, fontWeight: '800', color: 'white'}}>
               Advertisement
             </Text>
             {auth().currentUser &&
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
+                auth().currentUser.phoneNumber === '+919455791624' ||
+                auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
                   <TouchableOpacity onPress={handleEditLatestAdvirtaisement}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -564,7 +578,7 @@ const Home = () => {
                     </View>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleDeleteLatestAdvertisement}>
-                    <View style={{ flexDirection: 'row' }}>
+                    <View style={{flexDirection: 'row'}}>
                       <Text
                         style={{
                           fontSize: 12,
@@ -593,8 +607,6 @@ const Home = () => {
               </View>
             ))}
           </ScrollView>
-
-
         </View>
       </View>
 
@@ -602,6 +614,8 @@ const Home = () => {
         (auth().currentUser.phoneNumber === '+918790720978' ||
           auth().currentUser.phoneNumber === '+919052288377' ||
           auth().currentUser.phoneNumber === '+917022863475' ||
+          auth().currentUser.phoneNumber === '+919455791624' ||
+          auth().currentUser.phoneNumber === '+919839204763' ||
           auth().currentUser.phoneNumber === '+918853389395') && (
           <TouchableOpacity
             style={styles.postButton}
@@ -615,6 +629,8 @@ const Home = () => {
         (auth().currentUser.phoneNumber === '+918790720978' ||
           auth().currentUser.phoneNumber === '+919052288377' ||
           auth().currentUser.phoneNumber === '+917022863475' ||
+          auth().currentUser.phoneNumber === '+919455791624' ||
+          auth().currentUser.phoneNumber === '+919839204763' ||
           auth().currentUser.phoneNumber === '+918853389395') && (
           <TouchableOpacity
             style={styles.packageButton}
@@ -677,8 +693,8 @@ const styles = StyleSheet.create({
   updatesText: {
     fontSize: 14, // Adjust as needed
     textAlign: 'center', // Center text within its container
-    color:'black',
-    fontWeight:"600"
+    color: 'black',
+    fontWeight: '600',
   },
 
   languageSelector: {
@@ -784,7 +800,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
@@ -801,7 +817,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,

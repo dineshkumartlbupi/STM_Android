@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,8 @@ import {
   Alert,
   PermissionsAndroid,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import {useNavigation} from '@react-navigation/native';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 
 import {
   faFileText,
@@ -30,16 +30,14 @@ import firestore from '@react-native-firebase/firestore';
 import GroupFolder from '../components/GroupFolder';
 
 import storage from '@react-native-firebase/storage';
-import { launchImageLibrary } from 'react-native-image-picker';
+import {launchImageLibrary} from 'react-native-image-picker';
 
-
-import { Video } from 'expo-av';
-
+import {Video} from 'expo-av';
 
 const categoryData = [
-  { label: 'Latest Updates', value: 'latest_updates' },
-  { label: 'News', value: 'news' },
-  { label: 'Advertisement', value: 'advertisement' },
+  {label: 'Latest Updates', value: 'latest_updates'},
+  {label: 'News', value: 'news'},
+  {label: 'Advertisement', value: 'advertisement'},
 ];
 
 const CreatePost = () => {
@@ -56,29 +54,42 @@ const CreatePost = () => {
   const [packages, setPackages] = useState([]);
   const [hyperlink, setHyperlink] = useState('');
 
-
+  // Fetch packages from Firestore
   useEffect(() => {
-    const unsubscribe = firestore()
-      .collection('folders')
-      .orderBy('id', 'asc')
-      .onSnapshot(snapshot => {
-        const fetchedPackages = snapshot.docs.map(doc => ({
-          id: doc.data().id,
-          ...doc.data(),
-        }));
+    let isMounted = true; // Prevent state updates after unmount
+    const fetchPackages = async () => {
+      try {
+        setLoading(true);
+        const snapshot = await firestore()
+          .collection('folders')
+          .orderBy('id', 'asc')
+          .limit(10) // Adjust the limit as needed
+          .get();
 
-        // Add {label: 'All', value: '0'} at the 0 index
-        fetchedPackages.unshift({ label: 'All', value: '0' });
+        if (isMounted) {
+          const fetchedPackages = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
 
-        setPackages(fetchedPackages);
-      });
+          fetchedPackages.unshift({label: 'All', value: '0'});
+          setPackages(fetchedPackages);
+        }
+      } catch (error) {
+        console.error('Error fetching data from Firestore:', error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchPackages();
+    return () => {
+      isMounted = false; // Cleanup
+    };
   }, []);
 
-
   useEffect(() => {
-    async function requestStoragePermission() { 
+    async function requestStoragePermission() {
       try {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
@@ -87,7 +98,7 @@ const CreatePost = () => {
             message: 'This app needs access to your storage to read files.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
-            buttonPositive: 'OK', 
+            buttonPositive: 'OK',
           },
         );
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
@@ -106,7 +117,6 @@ const CreatePost = () => {
     Alert.alert(`You pressed ${folderName}`);
   };
 
-
   const validateFields = () => {
     if (categoryValue !== 'advertisement' && description === '') {
       Alert.alert('Error', 'Please Enter Description');
@@ -122,8 +132,6 @@ const CreatePost = () => {
     }
     return true;
   };
-  
-
 
   const handleAddPost = async () => {
     if (validateFields()) {
@@ -131,34 +139,37 @@ const CreatePost = () => {
         setUploading(true);
         const userId = auth().currentUser.uid;
         let uploadedFiles = [];
-  
+
         for (const file of selectedFiles) {
           const uploadUri = file.uri;
           let filename = uploadUri.substring(uploadUri.lastIndexOf('/') + 1);
           const fileExtension = filename.split('.').pop();
-          const fileNameWithoutExtension = filename.replace(`.${fileExtension}`, '');
+          const fileNameWithoutExtension = filename.replace(
+            `.${fileExtension}`,
+            '',
+          );
           filename = `${fileNameWithoutExtension}_${Date.now()}.${fileExtension}`;
-  
+
           const storageRef = storage().ref(`posts/${userId}/${filename}`);
           const task = storageRef.putFile(uploadUri);
-  
+
           await task;
-  
+
           const fileUrl = await storageRef.getDownloadURL();
           uploadedFiles.push({
             url: fileUrl,
             type: file.type || 'unknown',
           });
         }
-  
+
         // Ensure filteredPackages does not include undefined
         const filteredPackages = selectedPackages.includes('0')
           ? packages.map(pkg => pkg.id).filter(id => id !== '0') // Remove '0' if 'All' is selected
           : selectedPackages.filter(id => id !== '0'); // Filter out '0' if not needed
-  
+
         // Remove any undefined values
         const cleanedPackages = filteredPackages.filter(id => id !== undefined);
-  
+
         const postData = {
           description: description || '',
           category: categoryValue || '',
@@ -169,9 +180,8 @@ const CreatePost = () => {
           hyperlink: hyperlink || '',
         };
 
-  
         await firestore().collection('post').add(postData);
-  
+
         setUploading(false);
         Alert.alert('Success!', 'Post Data submitted successfully.');
         navigation.navigate('Home');
@@ -182,10 +192,9 @@ const CreatePost = () => {
       }
     }
   };
-  
 
   const selectImage = () => {
-    launchImageLibrary({ mediaType: 'photo' }, response => {
+    launchImageLibrary({mediaType: 'photo'}, response => {
       if (response.didCancel) {
         console.log('User cancelled image picker');
       } else if (response.errorMessage) {
@@ -193,14 +202,14 @@ const CreatePost = () => {
       } else {
         setSelectedFiles(prevFiles => [
           ...prevFiles,
-          { uri: response.assets[0].uri, type: 'image' },
+          {uri: response.assets[0].uri, type: 'image'},
         ]);
       }
     });
   };
 
   const selectVideo = () => {
-    launchImageLibrary({ mediaType: 'video' }, response => {
+    launchImageLibrary({mediaType: 'video'}, response => {
       if (response.didCancel) {
         console.log('User cancelled video picker');
       } else if (response.errorMessage) {
@@ -208,46 +217,53 @@ const CreatePost = () => {
       } else {
         setSelectedFiles(prevFiles => [
           ...prevFiles,
-          { uri: response.assets[0].uri, type: 'video' },
+          {uri: response.assets[0].uri, type: 'video'},
         ]);
       }
     });
   };
 
   const togglePackageSelection = item => {
-    if (item.value === '0') { // 'All' is selected
+    if (item.value === '0') {
+      // 'All' is selected
       if (selectedPackages.includes('0')) {
         // Deselect 'All' which should deselect all packages
         setSelectedPackages([]);
       } else {
         // Select 'All' which means selecting all packages
-        setSelectedPackages(packages.map(pkg => pkg.id).filter(id => id !== '0'));
+        setSelectedPackages(
+          packages.map(pkg => pkg.id).filter(id => id !== '0'),
+        );
       }
-    } else { // Specific package is selected/deselected
+    } else {
+      // Specific package is selected/deselected
       setSelectedPackages(prevSelectedPackages => {
         const newSelectedPackages = prevSelectedPackages.includes(item.id)
           ? prevSelectedPackages.filter(value => value !== item.id)
           : [...prevSelectedPackages, item.id];
-  
+
         // Ensure 'All' option reflects current selection
-        if (newSelectedPackages.length === packages.length - 1 && !newSelectedPackages.includes('0')) {
+        if (
+          newSelectedPackages.length === packages.length - 1 &&
+          !newSelectedPackages.includes('0')
+        ) {
           newSelectedPackages.push('0');
-        } else if (newSelectedPackages.includes('0') && newSelectedPackages.length < packages.length) {
+        } else if (
+          newSelectedPackages.includes('0') &&
+          newSelectedPackages.length < packages.length
+        ) {
           return newSelectedPackages.filter(value => value !== '0');
         }
         return newSelectedPackages;
       });
     }
   };
-  
-  
 
   const renderPackageItem = item => (
     <TouchableOpacity
       key={item.id}
       style={styles.item}
-      onPress={() => togglePackageSelection(item)}
-    >
+      onPress={() => togglePackageSelection(item)}>
       <Text style={styles.textItem}>
         {item.value === '0' ? item.label : item.name}
       </Text>
@@ -290,9 +306,18 @@ const CreatePost = () => {
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}>
-        <GroupFolder onFolderPress={handleFolderPress} packages={packages} />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+          </View>
+        ) : packages.length > 0 ? (
+          <GroupFolder onFolderPress={handleFolderPress} packages={packages} />
+        ) : (
+          <View />
+        )}
+
         <View style={styles.formContainer}>
-          <View style={{ paddingVertical: 10 }}>
+          <View style={{paddingVertical: 10}}>
             <TouchableOpacity
               style={styles.dropdown}
               onPress={() => setCategoryDropdownVisible(true)}>
@@ -316,7 +341,7 @@ const CreatePost = () => {
             </TouchableOpacity>
           </View>
           {categoryValue && (
-            <View style={{ paddingVertical: 10 }}>
+            <View style={{paddingVertical: 10}}>
               <TouchableOpacity
                 style={styles.dropdown}
                 onPress={() => setPackageDropdownVisible(true)}>
@@ -329,11 +354,11 @@ const CreatePost = () => {
                   <Text style={styles.selectedTextStyle}>
                     {selectedPackages.length > 0
                       ? selectedPackages
-                        .map(
-                          value =>
-                            packages.find(item => item.id === value)?.name,
-                        )
-                        .join(', ')
+                          .map(
+                            value =>
+                              packages.find(item => item.id === value)?.name,
+                          )
+                          .join(', ')
                       : 'Select Group'}
                   </Text>
                   <FontAwesomeIcon
@@ -349,7 +374,7 @@ const CreatePost = () => {
           <Modal
             isVisible={isCategoryDropdownVisible}
             onBackdropPress={() => setCategoryDropdownVisible(false)}
-            style={{ margin: 0, justifyContent: 'flex-end' }}>
+            style={{margin: 0, justifyContent: 'flex-end'}}>
             <View style={styles.modalContent}>
               {categoryData.map(renderCategoryItem)}
             </View>
@@ -357,7 +382,7 @@ const CreatePost = () => {
           <Modal
             isVisible={isPackageDropdownVisible}
             onBackdropPress={() => setPackageDropdownVisible(false)}
-            style={{ margin: 0, justifyContent: 'flex-end' }}>
+            style={{margin: 0, justifyContent: 'flex-end'}}>
             <View style={styles.modalContent}>
               {packages.map(renderPackageItem)}
             </View>
@@ -379,14 +404,14 @@ const CreatePost = () => {
                   <View style={styles.fileWrapper} key={index}>
                     {file.mediaType === 'video' ? (
                       <Video
-                        source={{ uri: file.uri }}
+                        source={{uri: file.uri}}
                         style={styles.videoStyle}
                         useNativeControls
                         isLooping={false}
                       />
                     ) : (
                       <Image
-                        source={{ uri: file.uri }}
+                        source={{uri: file.uri}}
                         style={styles.postImage}
                         resizeMode="stretch"
                       />
@@ -409,7 +434,6 @@ const CreatePost = () => {
             </View>
           )}
           {categoryValue && categoryValue === 'advertisement' && (
-
             <View style={styles.iconContainer}>
               <Text style={styles.label}>Hyperlink</Text>
               <TextInput
@@ -420,7 +444,12 @@ const CreatePost = () => {
                 value={hyperlink}
                 multiline
               />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-evenly',
+                  alignItems: 'center',
+                }}>
                 <View style={styles.iconButtonContainer}>
                   <TouchableOpacity
                     style={styles.iconButton}
@@ -452,12 +481,27 @@ const CreatePost = () => {
             <Text style={styles.addPostButtonText}>Add Post</Text>
           </TouchableOpacity>
         </View>
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   selectedFilesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',

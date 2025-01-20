@@ -15,6 +15,7 @@ import firestore from '@react-native-firebase/firestore';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faEdit, faTrash, faPlus} from '@fortawesome/free-solid-svg-icons';
 import Toast from 'react-native-toast-message';
+import {documentId} from 'firebase/firestore';
 
 const GroupFolder = () => {
   const navigation = useNavigation();
@@ -41,14 +42,15 @@ const GroupFolder = () => {
         }));
         setFolders(fetchedFolders);
         fetchPhoneNumbersCount(fetchedFolders);
-        setNextFolderId(
-          fetchedFolders.length > 0
-            ? fetchedFolders[fetchedFolders.length - 1].id + 1
-            : 1,
-        );
+
+        // setNextFolderId(
+        //   fetchedFolders.length > 0
+        //     ? fetchedFolders[fetchedFolders.length - 1].id + 1
+        //     : 1,
+        // );
         setLoading(false);
       });
-      setLoading(false);
+    setLoading(false);
     return () => unsubscribe();
   }, []);
 
@@ -98,20 +100,23 @@ const GroupFolder = () => {
         showToast('error', 'Error', 'Invalid folder object provided.');
         return;
       }
-  
+
       const folderId = String(folder.id); // Ensure folderId is a string
-  
+
       setLoading(true);
-  
+
       // Check if folder exists before deletion
-      const folderDoc = await firestore().collection('folders').doc(folderId).get();
+      const folderDoc = await firestore()
+        .collection('folders')
+        .doc(folderId)
+        .get();
       if (!folderDoc.exists) {
         console.error('Folder does not exist:', folderId);
         showToast('error', 'Error', 'Folder does not exist.');
         setLoading(false);
         return;
       }
-  
+
       // Proceed with deletion
       await firestore().collection('folders').doc(folderId).delete();
       setFolders(prev => prev.filter(f => f.id !== folder.id)); // Remove from local state
@@ -123,8 +128,6 @@ const GroupFolder = () => {
       setLoading(false);
     }
   };
-  
-  
 
   const createNewFolder = async () => {
     if (!newFolderName) {
@@ -134,19 +137,25 @@ const GroupFolder = () => {
 
     try {
       setLoading(true);
-      await firestore().collection('folders').doc(nextFolderId.toString()).set({
-        id: nextFolderId,
+      // Add a new folder to the "folders" collection
+      const folderRef = await firestore().collection('folders').add({
         name: newFolderName,
+        createdAt: firestore.FieldValue.serverTimestamp(),
       });
+      // Update the same document with its generated ID
+      await firestore().collection('folders').doc(folderRef.id).update({
+        id: folderRef.id,
+      });
+
+      // Close modal and reset the folder name
       setCreateFolderModalVisible(false);
       setNewFolderName('');
-      setNextFolderId(prevId => prevId + 1);
       showToast('success', 'Success', 'Folder created successfully!');
-      setLoading(false);
     } catch (error) {
-      setLoading(false);
       console.error('Error creating folder:', error);
       showToast('error', 'Error', 'Failed to create folder. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -165,13 +174,12 @@ const GroupFolder = () => {
       showToast('error', 'Error', 'Please enter a folder name.');
       return;
     }
-
     try {
       setLoading(true);
       await firestore()
         .collection('folders')
         .doc(folderToEdit.id.toString())
-        .update({name: editedFolderName});
+        .update({name: editedFolderName,updatedAt:firestore.FieldValue.serverTimestamp()});
       setEditFolderModalVisible(false);
       setFolderToEdit(null);
       setEditedFolderName('');

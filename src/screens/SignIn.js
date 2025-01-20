@@ -80,7 +80,8 @@ export default function SignIn() {
 
     if (phoneNumber.length === 10) {
       console.log(`Phone number entered: ${phoneNumber}`); // Debug: Phone number log
-      const isPhoneNumberValid = await validateInDB(phoneNumber);
+     const currectNumber=`${countryCode}${phoneNumber}`;
+      const isPhoneNumberValid = await validateInDB(currectNumber);
       console.log(`Phone number validation status: ${isPhoneNumberValid}`); // Debug: Validation status
       if (isPhoneNumberValid) {
         const fullPhoneNumber = `${countryCode}${phoneNumber}`; // Assuming country code is +91 (India)
@@ -121,6 +122,13 @@ export default function SignIn() {
     }
   };
 
+  const generateRandomuid = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0,
+        v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
   const handleConfirmOTP = async () => {
     if (otp.length === 6) {
       setLoading(true); // Start loading
@@ -128,26 +136,36 @@ export default function SignIn() {
         const userCredential = await confirmResult.confirm(otp);
         const user = userCredential.user; // Get the user object
         const token = await getFCMToken(); // Get FCM token
-
+        const randomId = generateRandomuid();
         // Check if user document already exists in Firestore
         const usersCollection = firestore().collection('users');
         const querySnapshot = await usersCollection
           .where('phoneNumber', '==', user.phoneNumber)
           .get();
-
         if (querySnapshot.empty) {
-          // If user doesn't exist, create a new document
           await usersCollection.add({
             phoneNumber: user.phoneNumber,
             fcmToken: token,
-            // Add other user details here (e.g., name, surname, shopName, etc.)
+            surname: 'Doe',
+            name: 'John',
+            shopName: 'Shop Name',
+            address: {
+              villageCity: 'City',
+              street: 'Street',
+              mandal: 'Mandal',
+              district: 'District',
+              state: 'State',
+            },
+            packages: {},
+            userid: randomId,
           });
         } else {
-          // If user exists, update the FCM token
           const userDocRef = querySnapshot.docs[0].ref; // Get the document reference
           await userDocRef.update({
-            fcmToken: token, // Update the FCM token
+            fcmToken: token, 
+
           });
+
           console.log(
             'User already exists in Firestore. FCM token updated.',
             token,

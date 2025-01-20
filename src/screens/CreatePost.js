@@ -49,8 +49,7 @@ const CreatePost = () => {
   const [selectedPackages, setSelectedPackages] = useState([]);
   const [categoryValue, setCategoryValue] = useState(null);
   const [isPackageDropdownVisible, setPackageDropdownVisible] = useState(false);
-  const [isCategoryDropdownVisible, setCategoryDropdownVisible] =
-    useState(false);
+  const [isCategoryDropdownVisible, setCategoryDropdownVisible] =useState(false);
   const [packages, setPackages] = useState([]);
   const [hyperlink, setHyperlink] = useState('');
 
@@ -62,16 +61,12 @@ const CreatePost = () => {
         setLoading(true);
         const snapshot = await firestore()
           .collection('folders')
-          .orderBy('id', 'asc')
-          .limit(10) // Adjust the limit as needed
           .get();
-
         if (isMounted) {
           const fetchedPackages = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
           }));
-
           fetchedPackages.unshift({label: 'All', value: '0'});
           setPackages(fetchedPackages);
         }
@@ -84,7 +79,7 @@ const CreatePost = () => {
 
     fetchPackages();
     return () => {
-      isMounted = false; // Cleanup
+      isMounted = false; //Cleanup
     };
   }, []);
 
@@ -149,10 +144,8 @@ const CreatePost = () => {
             '',
           );
           filename = `${fileNameWithoutExtension}_${Date.now()}.${fileExtension}`;
-
           const storageRef = storage().ref(`posts/${userId}/${filename}`);
           const task = storageRef.putFile(uploadUri);
-
           await task;
 
           const fileUrl = await storageRef.getDownloadURL();
@@ -341,35 +334,51 @@ const CreatePost = () => {
             </TouchableOpacity>
           </View>
           {categoryValue && (
-            <View style={{paddingVertical: 10}}>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => setPackageDropdownVisible(true)}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                  <Text style={styles.selectedTextStyle}>
-                    {selectedPackages.length > 0
-                      ? selectedPackages
-                          .map(
-                            value =>
-                              packages.find(item => item.id === value)?.name,
-                          )
-                          .join(', ')
-                      : 'Select Group'}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={faChevronCircleDown}
-                    style={styles.icon}
-                    color="black"
-                    size={20}
-                  />
-                </View>
-              </TouchableOpacity>
+          <ScrollView style={{paddingVertical: 10}}>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setPackageDropdownVisible(true)}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+              <Text style={styles.selectedTextStyle}>
+                {selectedPackages.length > 0
+                  ? selectedPackages
+                      .map(
+                        value => packages.find(item => item.id === value)?.name,
+                      )
+                      .join(', ')
+                  : 'Select Group'}
+              </Text>
+              <FontAwesomeIcon
+                icon={faChevronCircleDown}
+                style={styles.icon}
+                color="black"
+                size={20}
+              />
             </View>
+          </TouchableOpacity>
+    
+          {/* Show dropdown items */}
+          {isPackageDropdownVisible && (
+            <View style={styles.dropdownList}>
+              {packages.map(pkg => (
+                <TouchableOpacity
+                  key={pkg.id}
+                  style={[
+                    styles.dropdownItem,
+                    selectedPackages.includes(pkg.id) && styles.selectedItem,
+                  ]}
+                  onPress={() => togglePackageSelection(pkg.id)}>
+                  <Text style={styles.itemText}>{pkg.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
           )}
           <Modal
             isVisible={isCategoryDropdownVisible}
@@ -635,7 +644,7 @@ const styles = StyleSheet.create({
   },
   selectedTextStyle: {
     color: 'black',
-    fontWeight: '600',
+    fontWeight: '800',
     fontSize: 16,
   },
   modalContent: {
@@ -656,6 +665,37 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginLeft: 10,
+  },
+  dropdown: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    marginVertical: 10,
+  },
+  selectedTextStyle: {
+    color: 'black',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  icon: {
+    marginLeft: 10,
+  },
+  dropdownList: {
+    marginTop: 10,
+  },
+  dropdownItem: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    marginVertical: 5,
+  },
+  selectedItem: {
+    backgroundColor: '#e0e0e0',
+  },
+  itemText: {
+    fontSize: 16,
   },
 });
 

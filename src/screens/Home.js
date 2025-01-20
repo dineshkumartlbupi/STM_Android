@@ -101,10 +101,8 @@ const Home = () => {
       setLoading(true);
       const isAdmin = await checkIfAdmin();
       const userPackages = await fetchUserPackages();
-
       let query;
       const postsCollection = firestore().collection('post');
-
       if (isAdmin) {
         query = postsCollection.orderBy('timestamp', 'desc');
       } else {
@@ -118,13 +116,11 @@ const Home = () => {
             .orderBy('timestamp', 'desc');
         }
       }
-
       // Set up the listener
       const unsubscribe = query.onSnapshot(querySnapshot => {
         const latestUpdates = [];
         const news = [];
         const advertisements = [];
-
         // Ensure fromDate and toDate are Date objects, and adjust toDate to the end of the day
         const adjustedFromDate = fromDate ? new Date(fromDate) : null;
         const adjustedToDate = toDate ? new Date(toDate) : null;
@@ -139,13 +135,11 @@ const Home = () => {
 
           if (data && data.category) {
             let withinDateRange = true;
-
             // Log date information for debugging
             console.log('Document ID:', documentSnapshot.id);
             console.log('Timestamp:', timestamp);
-            if (adjustedFromDate) console.log('From Date:', adjustedFromDate);
+            if (adjustedFromDate) console.log('From Date:',adjustedFromDate);
             if (adjustedToDate) console.log('To Date:', adjustedToDate);
-
             // Check date conditions based on fromDate and toDate
             if (adjustedFromDate && adjustedToDate) {
               withinDateRange =
@@ -205,35 +199,51 @@ const Home = () => {
         auth().currentUser.phoneNumber === '+918790720978') ||
       auth().currentUser.phoneNumber === '+919052288377' ||
       auth().currentUser.phoneNumber === '+918853389395' ||
-      auth().currentUser.phoneNumber === '+919455791624' ||
       auth().currentUser.phoneNumber === '+919839204763' ||
       auth().currentUser.phoneNumber === '+917022863475' // New Admin phone number
     );
   };
 
+  
   const fetchUserPackages = async () => {
-    const phoneNumber = auth().currentUser.phoneNumber;
+    const phoneNumber = auth().currentUser?.phoneNumber;
+    if (!phoneNumber) {
+      Alert.alert('Error', 'No user is currently signed in.');
+      return [];
+    }
+  
     try {
       setLoading(true);
       const usersCollection = firestore().collection('users');
       const packageSet = new Set();
-      const cleanedPhoneNumber = phoneNumber.replace('+91', '');
-
+  
+      console.log('Fetching packages for phoneNumber:', phoneNumber);
+  
       const querySnapshot = await usersCollection
-        .where('phoneNumber', '==', cleanedPhoneNumber)
+        .where('phoneNumber', '==', phoneNumber)
         .get();
-
+  
+      if (querySnapshot.empty) {
+        console.log('No matching documents found for phoneNumber:', phoneNumber);
+      }
+  
       querySnapshot.forEach(doc => {
         const userData = doc.data();
+        console.log('User data:', userData);
+  
         if (userData.packages) {
           Object.keys(userData.packages).forEach(packageId => {
-            packageSet.add(packageId);
+            if (packageId) {
+              packageSet.add(packageId);
+            } else {
+              console.warn('Skipping non-numeric packageId:', packageId);
+            }
           });
         }
       });
       setLoading(false);
-      const uniquePackages = Array.from(packageSet).map(pkg => Number(pkg)); // Convert to numbers
-      console.log('Unique Packages:', uniquePackages); // Ensure they are numbers
+      const uniquePackages = Array.from(packageSet);
+      console.log('Unique Packages:', uniquePackages);
       return uniquePackages;
     } catch (error) {
       setLoading(false);
@@ -242,6 +252,7 @@ const Home = () => {
       return [];
     }
   };
+  
 
   useFocusEffect(
     React.useCallback(() => {
@@ -432,7 +443,7 @@ const Home = () => {
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
-                auth().currentUser.phoneNumber === '+919455791624' ||
+                // auth().currentUser.phoneNumber === '+919455791624' ||
                 auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
                 <View
@@ -496,7 +507,7 @@ const Home = () => {
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
-                auth().currentUser.phoneNumber === '+919455791624' ||
+                // auth().currentUser.phoneNumber === '+919455791624' ||
                 auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
                 <View
@@ -559,7 +570,7 @@ const Home = () => {
               (auth().currentUser.phoneNumber === '+918790720978' ||
                 auth().currentUser.phoneNumber === '+919052288377' ||
                 auth().currentUser.phoneNumber === '+917022863475' ||
-                auth().currentUser.phoneNumber === '+919455791624' ||
+                // auth().currentUser.phoneNumber === '+919455791624' ||
                 auth().currentUser.phoneNumber === '+919839204763' ||
                 auth().currentUser.phoneNumber === '+918853389395') && (
                 <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -614,7 +625,7 @@ const Home = () => {
         (auth().currentUser.phoneNumber === '+918790720978' ||
           auth().currentUser.phoneNumber === '+919052288377' ||
           auth().currentUser.phoneNumber === '+917022863475' ||
-          auth().currentUser.phoneNumber === '+919455791624' ||
+          // auth().currentUser.phoneNumber === '+919455791624' ||
           auth().currentUser.phoneNumber === '+919839204763' ||
           auth().currentUser.phoneNumber === '+918853389395') && (
           <TouchableOpacity
@@ -629,7 +640,7 @@ const Home = () => {
         (auth().currentUser.phoneNumber === '+918790720978' ||
           auth().currentUser.phoneNumber === '+919052288377' ||
           auth().currentUser.phoneNumber === '+917022863475' ||
-          auth().currentUser.phoneNumber === '+919455791624' ||
+          // auth().currentUser.phoneNumber === '+919455791624' ||
           auth().currentUser.phoneNumber === '+919839204763' ||
           auth().currentUser.phoneNumber === '+918853389395') && (
           <TouchableOpacity

@@ -62,6 +62,7 @@ export const createNotificationChannel = async () => {
       id: 'default',
       name: 'Default Channel',
       importance: AndroidImportance.HIGH,
+      sound: 'default',
     });
     console.log('Notification channel created.');
   } catch (error) {
@@ -85,6 +86,7 @@ export const displayNotification = async (title, body) => {
       android: {
         channelId: 'default',
         importance: AndroidImportance.HIGH,
+        sound: 'default',
       },
     });
   } catch (error) {

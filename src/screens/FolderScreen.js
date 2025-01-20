@@ -124,16 +124,24 @@ const FolderScreen = ({route}) => {
   
     debugLog('Parsed numbersArray', numbersArray);
   
+    if (numbersArray.length > 500) {  
+      Alert.alert('Error', 'You can only add up to 500 users at a time.');
+      return;
+    }
+
     const newNumbersSet = new Set(phoneNumbers); // Use Set for efficient duplicate checks
     const duplicates = [];
     const uniqueNumbers = [];
   
     numbersArray.forEach(number => {
-      if (newNumbersSet.has(number)) {
-        duplicates.push(number);
+      // Ensure each phone number starts with +91 if not already present
+      let formattedNumber = number.startsWith('+91') ? number : `+91${number}`;
+  
+      if (newNumbersSet.has(formattedNumber)) {
+        duplicates.push(formattedNumber);
       } else {
-        uniqueNumbers.push(number);
-        newNumbersSet.add(number); // Add to the set for tracking
+        uniqueNumbers.push(formattedNumber);
+        newNumbersSet.add(formattedNumber); // Add to the set for tracking
       }
     });
   
@@ -142,18 +150,27 @@ const FolderScreen = ({route}) => {
   
     if (uniqueNumbers.length > 0) {
       setLoading(true);
-  
       try {
         const usersCollection = firestore().collection('users');
+        const id=folder.id;
         // Process Firestore additions for unique numbers
+        console.log('FolderId :: ',id);
         await Promise.all(
           uniqueNumbers.map(async number => {
             debugLog('Adding number to Firestore', number);
   
-            const userSnapshot = await usersCollection.where('phoneNumber', '==', number).get();
-  
-            if (!userSnapshot.empty) {
-              debugLog('Number already exists in Firestore', number);
+            const userSnapshot = await usersCollection.where('phoneNumber', '==', number)
+            .get();  
+            console.log("Its working ::  ",userSnapshot.docs[0] &&
+              userSnapshot.docs[0].data());
+            if (
+              !userSnapshot.empty &&
+              userSnapshot.docs[0] &&
+              userSnapshot.docs[0].data() &&
+              userSnapshot.docs[0].data().packages &&
+              userSnapshot.docs[0].data().packages[id]
+            )  {
+              debugLog('Number already exists in Firestore', );
             } else {
               const randomId = generateRandomuid();
               const id=folder.id;
@@ -179,11 +196,11 @@ const FolderScreen = ({route}) => {
             }
           }),
         );
+
         // Update local state after successful additions
         setPhoneNumbers(prevNumbers => [...prevNumbers, ...uniqueNumbers]);
         setInputText('');
         setSuccessMessage('Successfully added new contacts.');
-  
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -276,6 +293,7 @@ const FolderScreen = ({route}) => {
         onChangeText={setInputText}
         multiline
          textAlignVertical="top"
+         numberOfLines={100}
       />
       <TouchableOpacity style={styles.addButton} onPress={handleAddNumbers}>
         <Text style={styles.addButtonText}>Add Numbers</Text>

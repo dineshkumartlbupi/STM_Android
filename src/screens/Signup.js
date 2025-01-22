@@ -15,6 +15,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCheck,
   faChevronCircleDown,
+  faChevronCircleLeft,
   faCross,
   faPhone,
   faShop,
@@ -28,7 +29,7 @@ import Modal from 'react-native-modal';
 const {width} = Dimensions.get('window');
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
-import { getFCMToken } from '../utils/notification';
+import {getFCMToken} from '../utils/notification';
 
 export default function Signup() {
   const [loading, setLoading] = useState(false);
@@ -218,27 +219,27 @@ export default function Signup() {
         const token = await getFCMToken();
         let totalPrice = 0;
         let totalPackagesWithDurationsAndPrice = [];
-  
+
         // Iterate over the selected packages
         selectedPackages.forEach(pkgId => {
           // Find the corresponding package object by its ID
           const pkg = packages.find(p => p.id === pkgId);
-  
+
           if (pkg) {
             // Get the selected duration index for this package
             const selectedDurationIndex = selectedDurations[pkgId.toString()];
-  
+
             // Find the selected duration within the package
             const selectedDuration = pkg.durations.find(
               d => d.id === selectedDurationIndex,
             );
-  
+
             if (selectedDuration) {
               console.log(
                 `Package: ${pkg.name}, Duration: ${selectedDuration.duration}, Price: ${selectedDuration.price}`,
               );
               totalPrice += parseFloat(selectedDuration.price);
-  
+
               // Store the package, duration, and price details
               totalPackagesWithDurationsAndPrice.push({
                 packageName: pkg.name,
@@ -254,7 +255,7 @@ export default function Signup() {
             console.error(`Package with ID ${pkgId} not found`);
           }
         });
-  
+
         console.log(
           'Total Packages with Durations and Price:',
           totalPackagesWithDurationsAndPrice,
@@ -262,15 +263,15 @@ export default function Signup() {
         // Log the total price
         console.log(`Total Price: ${totalPrice}`);
         setLoading(true);
-  
+
         try {
           const usersCollection = firestore().collection('users');
-  
+
           // Query Firestore to check if the user already exists
           const userSnapshot = await usersCollection
             .where('phoneNumber', '==', phoneNumber)
             .get();
-  
+
           if (!userSnapshot.empty) {
             // Update existing user data
             const existingUserId = userSnapshot.docs[0].id; // Get the ID of the existing user
@@ -284,12 +285,11 @@ export default function Signup() {
                 mandal: mandal,
                 district: district,
                 state: state,
-               
               },
               packages: totalPackagesWithDurationsAndPrice, // Save packages with durations and prices
               fcmToken: token,
             });
-  
+
             console.log('User data updated in Firestore!');
             Alert.alert('Success!', 'Proceed to Pay!');
             navigation.navigate('Payment', {
@@ -315,7 +315,7 @@ export default function Signup() {
               userid: randomId,
               fcmToken: token,
             });
-  
+
             console.log('User data added to Firestore!');
             Alert.alert('Success!', 'Account created successfully!');
             navigation.navigate('Payment', {
@@ -324,7 +324,10 @@ export default function Signup() {
             });
           }
         } catch (error) {
-          console.error('Error adding/updating user data in Firestore: ', error);
+          console.error(
+            'Error adding/updating user data in Firestore: ',
+            error,
+          );
           Alert.alert('Error', 'Failed to save data. Please try again.');
         } finally {
           setLoading(false);
@@ -338,7 +341,7 @@ export default function Signup() {
       }
     }
   };
-  
+
   // Function to start the resend timer
   const startResendTimer = () => {
     const intervalId = setInterval(() => {
@@ -390,10 +393,16 @@ export default function Signup() {
 
   return (
     <View style={{flex: 1}}>
+   
       <KeyboardAwareScrollView
         style={{flex: 1, backgroundColor: '#f6fbff'}}
         contentContainerStyle={{flexGrow: 1, padding: 20}}
         extraScrollHeight={150}>
+             <View>
+        <TouchableOpacity onPress={() => navigation.pop()}>
+          <FontAwesomeIcon icon={faChevronCircleLeft} size={30} color="black" />
+        </TouchableOpacity>
+      </View>
         {!confirmResult ? (
           <>
             <Animatable.Text
@@ -819,7 +828,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderColor: '#ccc',
-    color:'black',
+    color: 'black',
     borderWidth: 1,
     borderRadius: 5,
     padding: 10,
@@ -827,12 +836,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   textDropdown: {
-    color:'black',
+    color: 'black',
     fontSize: 16,
   },
   durationLabel: {
-    fontSize:16,
-    color:'black',
+    fontSize: 16,
+    color: 'black',
   },
   modalContent: {
     backgroundColor: 'white',

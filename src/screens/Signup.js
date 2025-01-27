@@ -95,6 +95,7 @@ export default function Signup() {
       return false;
     }
 
+    
     for (const pkg of selectedPackages) {
       if (!selectedDurations[pkg]) {
         Alert.alert(

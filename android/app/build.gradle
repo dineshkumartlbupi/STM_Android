@@ -79,8 +79,8 @@ android {
         applicationId "com.myapp.stm"
         minSdkVersion 24
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "8.0"
+        versionCode 9
+        versionName "9.0"
     }
     signingConfigs {
          release {

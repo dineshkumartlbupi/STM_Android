@@ -172,27 +172,46 @@ const FolderScreen = ({route}) => {
             )  {
               debugLog('Number already exists in Firestore', );
             } else {
+              const querySnapshot = await usersCollection
+              .where('phoneNumber', '==', number)
+              .get();
               const randomId = generateRandomuid();
               const id=folder.id;
-              const newUser = {
-                surname: 'Doe',
-                name: 'John',
-                phoneNumber: number,
-                shopName: 'Shop Name',
-                address: {
-                  villageCity: 'City',
-                  street: 'Street',
-                  mandal: 'Mandal',
-                  district: 'District',
-                  state: 'State',
-                },
-                packages: {
-                  [id]: '',
-                },
-                userid: randomId,
-              };
-              await usersCollection.doc(randomId).set(newUser);
-              debugLog('Added new user to Firestore', newUser);
+              if (!querySnapshot.empty) {
+                // If the user exists, update the 'packages' field
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data();
+          
+                // Safely add the folder ID to the packages object
+                const updatedPackages = {
+                  ...userData.packages,
+                  [id]: '', 
+                };
+
+                await userDoc.ref.update({ packages: updatedPackages });
+                debugLog('Updated existing user with new folder ID:', updatedPackages);
+              } else {
+                const newUser = {
+                  surname: 'Doe',
+                  name: 'John',
+                  phoneNumber: number,
+                  shopName: 'Shop Name',
+                  address: {
+                    villageCity: 'City',
+                    street: 'Street',
+                    mandal: 'Mandal',
+                    district: 'District',
+                    state: 'State',
+                  },
+                  packages: {
+                    [id]: '',
+                  },
+                  userid: randomId,
+                };
+                await usersCollection.doc(randomId).set(newUser);
+                debugLog('Added new user to Firestore', newUser);
+              }
+                
             }
           }),
         );
